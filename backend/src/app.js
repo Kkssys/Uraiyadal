@@ -15,37 +15,16 @@ const { sendOTPEmail } = require('./utils/emailService');
 // Create express app
 const app = express();
 
-// ========== CORS CONFIGURATION ==========
-// Allowed origins for production and development
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5000',
-  'https://transcendent-piroshki-be2b86.netlify.app',  // Old Netlify URL
-  'https://uraiyadal-chat.netlify.app',               // NEW Netlify URL - ADD THIS
-  'https://uraiyadal-o842.onrender.com'
-];
-// CORS middleware
+// ========== CORS CONFIGURATION - FIXED FOR NETLIFY ==========
+// Simple CORS configuration that works with any frontend
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.warn(`⚠️ Blocked CORS request from origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true,  // This reflects the request origin (works with Netlify)
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  exposedHeaders: ['Content-Length', 'X-Requested-With'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// Handle preflight requests
+// Handle preflight requests for all routes
 app.options('*', cors());
 
 // Debug middleware to log incoming requests
@@ -127,17 +106,14 @@ const uploadMedia = multer({
 });
 
 // ========== STATIC FILES ==========
-// Serve static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads/media', express.static(path.join(__dirname, '../uploads/media')));
 
 // ========== TEST ROUTES ==========
-// Test route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is working!' });
 });
 
-// Test auth route
 app.get('/api/test-auth', authMiddleware, (req, res) => {
   res.json({ 
     message: 'Auth working!', 

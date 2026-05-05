@@ -9,12 +9,23 @@ const PrivateMessage = require('./models/PrivateMessage');
 const jwt = require('jsonwebtoken');
 
 const server = http.createServer(app);
+
+// Configure Socket.io with CORS
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:5000",
+      "https://uraiyadal-chat.netlify.app",
+      "https://transcendent-piroshki-be2b86.netlify.app",
+      "https://uraiyadal-o842.onrender.com"
+    ],
     credentials: true,
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  },
+  transports: ['polling', 'websocket'],
+  allowEIO3: true
 });
 
 // Track online users
@@ -28,10 +39,10 @@ app.set('io', io);
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB');
-   const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server running on port ${PORT}`);
+    });
   })
   .catch(err => {
     console.error('❌ MongoDB connection error:', err);
@@ -178,7 +189,6 @@ io.on('connection', (socket) => {
         messageType: message.messageType,
         createdAt: message.createdAt,
         read: message.read,
-        readAt: message.readAt,
         delivered: false,
         deletedBy: message.deletedBy,
         deletedForEveryone: message.deletedForEveryone
@@ -188,7 +198,6 @@ io.on('connection', (socket) => {
       
       const recipient = onlineUsers.get(toUserId);
       if (recipient) {
-        // Mark as delivered
         message.delivered = true;
         message.deliveredAt = new Date();
         await message.save();
@@ -196,8 +205,6 @@ io.on('connection', (socket) => {
         messageData.deliveredAt = message.deliveredAt;
         
         io.to(recipient.socketId).emit('private-message-received', messageData);
-        
-        // Notify sender that message was delivered
         socket.emit('message-delivered', {
           messageId: message._id,
           deliveredAt: message.deliveredAt
@@ -218,13 +225,11 @@ io.on('connection', (socket) => {
       const message = await PrivateMessage.findById(messageId);
       if (!message) return;
       
-      // Only mark as read if the current user is the recipient
       if (message.to.toString() === currentUser._id.toString() && !message.read) {
         message.read = true;
         message.readAt = new Date();
         await message.save();
         
-        // Notify the sender that message was read
         const sender = onlineUsers.get(message.from.toString());
         if (sender) {
           io.to(sender.socketId).emit('message-read', {
@@ -239,39 +244,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle mark messages as read when chat is opened
-  socket.on('mark-messages-read', async (data) => {
-    try {
-      const { fromUserId } = data;
-      
-      const result = await PrivateMessage.updateMany(
-        { 
-          from: fromUserId, 
-          to: currentUser._id, 
-          read: false 
-        },
-        { 
-          read: true, 
-          readAt: new Date() 
-        }
-      );
-      
-      if (result.modifiedCount > 0) {
-        // Notify the sender that messages were read
-        const sender = onlineUsers.get(fromUserId);
-        if (sender) {
-          io.to(sender.socketId).emit('messages-read', {
-            fromUserId: currentUser._id,
-            fromUsername: currentUser.username,
-            count: result.modifiedCount
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
-    }
-  });
-
   // Handle typing in private chat
   socket.on('typing-private', (data) => {
     const { toUserId, isTyping } = data;
@@ -282,53 +254,6 @@ io.on('connection', (socket) => {
         fromUsername: currentUser.username,
         fromProfilePicture: currentUser.profilePicture,
         isTyping: isTyping
-      });
-    }
-  });
-
-  // Handle message deleted for me
-  socket.on('message-deleted-for-me', (data) => {
-    const { messageId, deletedBy } = data;
-    console.log(`Message ${messageId} deleted for user ${deletedBy}`);
-  });
-
-  // Handle message deleted for everyone
-  socket.on('message-deleted-for-everyone', (data) => {
-    const { messageId } = data;
-    io.emit('message-deleted-for-everyone', { messageId });
-    console.log(`Message ${messageId} deleted for everyone`);
-  });
-
-  // Handle chat cleared
-  socket.on('chat-cleared', (data) => {
-    const { clearedBy, clearedByUsername, withUserId } = data;
-    const recipient = onlineUsers.get(withUserId);
-    if (recipient) {
-      io.to(recipient.socketId).emit('chat-cleared', {
-        clearedBy: clearedBy,
-        clearedByUsername: clearedByUsername
-      });
-    }
-    console.log(`Chat cleared by ${clearedByUsername}`);
-  });
-
-  // Handle user unblocked
-  socket.on('user-unblocked-socket', (data) => {
-    const { unblockedUserId, unblockedByUserId, unblockedByUsername } = data;
-    
-    const unblockedUser = onlineUsers.get(unblockedUserId);
-    if (unblockedUser) {
-      io.to(unblockedUser.socketId).emit('you-were-unblocked', {
-        byUserId: unblockedByUserId,
-        byUsername: unblockedByUsername
-      });
-    }
-    
-    const unblocker = onlineUsers.get(unblockedByUserId);
-    if (unblocker) {
-      io.to(unblocker.socketId).emit('unblock-successful', {
-        unblockedUserId: unblockedUserId,
-        unblockedUsername: data.unblockedUsername
       });
     }
   });
