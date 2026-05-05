@@ -15,22 +15,50 @@ const { sendOTPEmail } = require('./utils/emailService');
 // Create express app
 const app = express();
 
-// Middleware
-// Update the CORS middleware
+// ========== CORS CONFIGURATION ==========
+// Allowed origins for production and development
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'https://transcendent-piroshki-be2b86.netlify.app',
+  'https://uraiyadal-o842.onrender.com'
+];
+
+// CORS middleware
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "http://localhost:5000",
-    "https://transcendent-piroshki-be2b86.netlify.app",  // Your Netlify frontend URL
-    "https://uraiyadal-o842.onrender.com"               // Your Render backend URL
-  ],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️ Blocked CORS request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Length', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+// Handle preflight requests
+app.options('*', cors());
+
+// Debug middleware to log incoming requests
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path} from origin: ${req.headers.origin || 'same-origin'}`);
+  next();
+});
+
+// Other middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ========== MULTER CONFIGURATION ==========
 // Configure multer for profile picture uploads
 const profileStorage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -98,10 +126,12 @@ const uploadMedia = multer({
   fileFilter: mediaFileFilter
 });
 
+// ========== STATIC FILES ==========
 // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads/media', express.static(path.join(__dirname, '../uploads/media')));
 
+// ========== TEST ROUTES ==========
 // Test route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is working!' });
@@ -331,7 +361,7 @@ app.post('/api/login', async (req, res) => {
 
 // ========== FRIEND ROUTES ==========
 
-// Get friends list
+// Get friends list (excluding blocked users)
 app.get('/api/friends', authMiddleware, async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
@@ -611,79 +641,70 @@ app.delete('/api/remove-friend/:friendId', authMiddleware, async (req, res) => {
 
 // ========== BLOCK/UNBLOCK ROUTES ==========
 
-// Block user - COMPLETELY REWRITTEN
+// Block user
 app.post('/api/block-user/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    console.log('🚫 Block user request');
-    console.log('Current user ID:', req.user?._id);
-    console.log('User to block ID:', userId);
+    console.log('🚫 Block user request received');
+    console.log('req.user:', req.user ? req.user._id : 'No user');
+    console.log('userId param:', userId);
     
-    // Authentication check
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ error: 'Authentication failed' });
+      console.error('❌ Authentication failed - no user in request');
+      return res.status(401).json({ error: 'Authentication failed. Please login again.' });
     }
     
     if (userId === req.user._id.toString()) {
       return res.status(400).json({ error: 'Cannot block yourself' });
     }
     
-    // Find user to block
     const userToBlock = await User.findById(userId);
     if (!userToBlock) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // Ensure arrays exist
+    console.log(`Blocking user: ${userToBlock.username} by ${req.user.username}`);
+    
     if (!req.user.blockedUsers) req.user.blockedUsers = [];
     if (!userToBlock.blockedBy) userToBlock.blockedBy = [];
+    if (!req.user.friends) req.user.friends = [];
+    if (!userToBlock.friends) userToBlock.friends = [];
+    if (!req.user.friendRequests) req.user.friendRequests = [];
+    if (!userToBlock.friendRequests) userToBlock.friendRequests = [];
+    if (!userToBlock.notifications) userToBlock.notifications = [];
     
-    // Check if already blocked
     if (req.user.blockedUsers.includes(userId)) {
       return res.status(400).json({ error: 'User already blocked' });
     }
     
-    // Remove from friends if exists
-    const friendIndex = req.user.friends ? req.user.friends.indexOf(userId) : -1;
+    // Remove from friends using splice for safety
+    const friendIndex = req.user.friends.indexOf(userId);
     if (friendIndex !== -1) {
       req.user.friends.splice(friendIndex, 1);
     }
     
-    const friendIndexOther = userToBlock.friends ? userToBlock.friends.indexOf(req.user._id.toString()) : -1;
+    const friendIndexOther = userToBlock.friends.indexOf(req.user._id.toString());
     if (friendIndexOther !== -1) {
       userToBlock.friends.splice(friendIndexOther, 1);
     }
     
-    // Add to blocked list
     req.user.blockedUsers.push(userId);
     userToBlock.blockedBy.push(req.user._id);
     
-    // Remove friend requests - safely using a new array
+    // Safe filtering of friend requests
     if (req.user.friendRequests && req.user.friendRequests.length > 0) {
-      const newRequests = [];
-      for (let i = 0; i < req.user.friendRequests.length; i++) {
-        const reqItem = req.user.friendRequests[i];
-        if (reqItem && reqItem.from && reqItem.from.toString() !== userId) {
-          newRequests.push(reqItem);
-        }
-      }
-      req.user.friendRequests = newRequests;
+      req.user.friendRequests = req.user.friendRequests.filter(req => {
+        return req && req.from && req.from.toString() !== userId;
+      });
     }
     
     if (userToBlock.friendRequests && userToBlock.friendRequests.length > 0) {
-      const newRequests = [];
-      for (let i = 0; i < userToBlock.friendRequests.length; i++) {
-        const reqItem = userToBlock.friendRequests[i];
-        if (reqItem && reqItem.from && reqItem.from.toString() !== req.user._id.toString()) {
-          newRequests.push(reqItem);
-        }
-      }
-      userToBlock.friendRequests = newRequests;
+      userToBlock.friendRequests = userToBlock.friendRequests.filter(req => {
+        return req && req.from && req.from.toString() !== req.user._id.toString();
+      });
     }
     
-    // Add notification
-    if (!userToBlock.notifications) userToBlock.notifications = [];
     userToBlock.notifications.push({
       type: 'user_blocked',
       from: req.user._id,
@@ -697,7 +718,6 @@ app.post('/api/block-user/:userId', authMiddleware, async (req, res) => {
     await req.user.save();
     await userToBlock.save();
     
-    // Emit socket event
     const io = req.app.get('io');
     const recipient = global.onlineUsers?.get(userId);
     if (recipient && io) {
@@ -709,7 +729,11 @@ app.post('/api/block-user/:userId', authMiddleware, async (req, res) => {
     
     console.log('✅ User blocked successfully');
     res.json({ 
-      message: 'User blocked successfully'
+      message: 'User blocked successfully',
+      blockedUser: {
+        id: userToBlock._id,
+        username: userToBlock.username
+      }
     });
   } catch (error) {
     console.error('❌ Error blocking user:', error);
@@ -722,9 +746,9 @@ app.delete('/api/unblock-user/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    console.log('🔓 Unblock user request');
-    console.log('Current user ID:', req.user?._id);
-    console.log('User to unblock ID:', userId);
+    console.log('🔓 Unblock user request received');
+    console.log('req.user:', req.user ? req.user._id : 'No user');
+    console.log('userId param:', userId);
     
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: 'Authentication failed' });
@@ -742,11 +766,9 @@ app.delete('/api/unblock-user/:userId', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'User is not blocked' });
     }
     
-    // Remove from blocked lists
     req.user.blockedUsers = req.user.blockedUsers.filter(id => id.toString() !== userId);
     userToUnblock.blockedBy = userToUnblock.blockedBy.filter(id => id.toString() !== req.user._id.toString());
     
-    // Add notification
     if (!userToUnblock.notifications) userToUnblock.notifications = [];
     userToUnblock.notifications.push({
       type: 'user_unblocked',
@@ -817,6 +839,7 @@ app.get('/api/check-blocked/:userId', authMiddleware, async (req, res) => {
 
 // ========== NOTIFICATION ROUTES ==========
 
+// Get notifications
 app.get('/api/notifications', authMiddleware, async (req, res) => {
   try {
     const notifications = req.user.notifications || [];
@@ -829,6 +852,7 @@ app.get('/api/notifications', authMiddleware, async (req, res) => {
   }
 });
 
+// Mark notification as read
 app.put('/api/mark-notification-read/:notificationId', authMiddleware, async (req, res) => {
   try {
     const { notificationId } = req.params;
@@ -851,6 +875,7 @@ app.put('/api/mark-notification-read/:notificationId', authMiddleware, async (re
 
 // ========== MESSAGE ROUTES ==========
 
+// Get conversation between two users
 app.get('/api/conversation/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -873,6 +898,7 @@ app.get('/api/conversation/:userId', authMiddleware, async (req, res) => {
   }
 });
 
+// Get messages (public)
 app.get('/api/messages', authMiddleware, async (req, res) => {
   try {
     const messages = await Message.find()
@@ -885,6 +911,7 @@ app.get('/api/messages', authMiddleware, async (req, res) => {
   }
 });
 
+// Send media message
 app.post('/api/send-media-message', authMiddleware, uploadMedia.single('media'), async (req, res) => {
   try {
     const { toUserId, messageType, caption } = req.body;
@@ -967,6 +994,7 @@ app.post('/api/send-media-message', authMiddleware, uploadMedia.single('media'),
   }
 });
 
+// Download media file
 app.get('/api/download-media/:filename', authMiddleware, async (req, res) => {
   try {
     const { filename } = req.params;
@@ -985,6 +1013,7 @@ app.get('/api/download-media/:filename', authMiddleware, async (req, res) => {
 
 // ========== MESSAGE DELETION ROUTES ==========
 
+// Delete message for myself
 app.delete('/api/delete-message-for-me/:messageId', authMiddleware, async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -1024,6 +1053,7 @@ app.delete('/api/delete-message-for-me/:messageId', authMiddleware, async (req, 
   }
 });
 
+// Delete message for everyone
 app.delete('/api/delete-message-for-everyone/:messageId', authMiddleware, async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -1055,6 +1085,7 @@ app.delete('/api/delete-message-for-everyone/:messageId', authMiddleware, async 
   }
 });
 
+// Clear entire chat history
 app.delete('/api/clear-chat/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1092,6 +1123,7 @@ app.delete('/api/clear-chat/:userId', authMiddleware, async (req, res) => {
 
 // ========== SETTINGS ROUTES ==========
 
+// Update Username
 app.put('/api/update-username', authMiddleware, async (req, res) => {
   try {
     const { newUsername } = req.body;
@@ -1146,6 +1178,7 @@ app.put('/api/update-username', authMiddleware, async (req, res) => {
   }
 });
 
+// Upload Profile Picture
 app.post('/api/upload-profile-picture', authMiddleware, uploadProfile.single('profilePicture'), async (req, res) => {
   try {
     if (!req.file) {
@@ -1179,6 +1212,7 @@ app.post('/api/upload-profile-picture', authMiddleware, uploadProfile.single('pr
   }
 });
 
+// Remove Profile Picture
 app.delete('/api/remove-profile-picture', authMiddleware, async (req, res) => {
   try {
     if (req.user.profilePicture) {
@@ -1205,6 +1239,7 @@ app.delete('/api/remove-profile-picture', authMiddleware, async (req, res) => {
   }
 });
 
+// Get User Settings
 app.get('/api/user-settings', authMiddleware, async (req, res) => {
   try {
     res.json({
