@@ -13,7 +13,7 @@ import FriendMenu from './components/FriendMenu';
 import BlockedUsers from './components/BlockedUsers';
 import LoadingScreen from './components/LoadingScreen';
 
-axios.defaults.baseURL = 'https://uraiyadal-o842.onrender.com';
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 function App() {
   const { colors } = useTheme();
@@ -134,7 +134,7 @@ function App() {
       fetchFriends();
       fetchUnreadRequests();
       
-      const newSocket = io('https://uraiyadal-o842.onrender.com', {
+      const newSocket = io('https://uraiyadal-o842.onrender.com' || 'http://localhost:5000', {
         auth: { token },
         transports: ['polling', 'websocket']
       });

@@ -16,8 +16,14 @@ const { sendOTPEmail } = require('./utils/emailService');
 const app = express();
 
 // Middleware
+// Update the CORS middleware
 app.use(cors({
-  origin: ["http://localhost:3000", "https://uraiyadal-o842.onrender.com"],
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "https://transcendent-piroshki-be2b86.netlify.app",  // Your Netlify frontend URL
+    "https://uraiyadal-o842.onrender.com"               // Your Render backend URL
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
