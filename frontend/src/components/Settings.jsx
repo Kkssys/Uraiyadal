@@ -289,7 +289,7 @@ const Settings = ({ user, onUpdate, onClose, onLogout }) => {
               <div style={dynamicStyles.profilePictureContainer}>
                 {user.profilePicture ? (
                   <img 
-                    src={`http://localhost:5000${user.profilePicture}`}
+                    src={`https://uraiyadal-o842.onrender.com${user.profilePicture}`}
                     alt={user.username}
                     style={dynamicStyles.profilePicture}
                   />

@@ -13,7 +13,7 @@ import FriendMenu from './components/FriendMenu';
 import BlockedUsers from './components/BlockedUsers';
 import LoadingScreen from './components/LoadingScreen';
 
-axios.defaults.baseURL = 'http://localhost:5000';
+axios.defaults.baseURL = 'https://uraiyadal-o842.onrender.com';
 
 function App() {
   const { colors } = useTheme();
@@ -134,7 +134,7 @@ function App() {
       fetchFriends();
       fetchUnreadRequests();
       
-      const newSocket = io('http://localhost:5000', {
+      const newSocket = io('https://uraiyadal-o842.onrender.com', {
         auth: { token },
         transports: ['polling', 'websocket']
       });
@@ -324,7 +324,7 @@ function App() {
               </div>
               {user.profilePicture ? (
                 <img 
-                  src={`http://localhost:5000${user.profilePicture}`} 
+                  src={`https://uraiyadal-o842.onrender.com${user.profilePicture}`} 
                   alt={user.username}
                   style={styles.avatarImage}
                 />
@@ -368,7 +368,7 @@ function App() {
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px' }} onClick={() => setSelectedUser(friend)}>
                     {friend.profilePicture ? (
                       <img 
-                        src={`http://localhost:5000${friend.profilePicture}`}
+                        src={`https://uraiyadal-o842.onrender.com${friend.profilePicture}`}
                         alt={friend.username}
                         style={styles.friendAvatar}
                       />

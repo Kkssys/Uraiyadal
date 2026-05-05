@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import UnifiedFriendButton from './UnifiedFriendButton';
-import { useTheme } from '../context/ThemeContext';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import UnifiedFriendButton from "./UnifiedFriendButton";
+import { useTheme } from "../context/ThemeContext";
 
 const FriendRequests = ({ onClose, onRequestHandled, user, socket }) => {
   const { colors } = useTheme();
@@ -10,125 +10,125 @@ const FriendRequests = ({ onClose, onRequestHandled, user, socket }) => {
 
   useEffect(() => {
     fetchRequests();
-    
+
     if (socket) {
-      socket.on('friend-request-received', () => {
+      socket.on("friend-request-received", () => {
         fetchRequests();
       });
-      
+
       return () => {
-        socket.off('friend-request-received');
+        socket.off("friend-request-received");
       };
     }
   }, [socket]);
 
   const fetchRequests = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/friend-requests', {
-        headers: { Authorization: `Bearer ${token}` }
+      const token = localStorage.getItem("token");
+      const response = await axios.get("/api/friend-requests", {
+        headers: { Authorization: `Bearer ${token}` },
       });
       setRequests(response.data);
     } catch (error) {
-      console.error('Error fetching requests:', error);
+      console.error("Error fetching requests:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleFriendStatusChange = (userId, newStatus) => {
-    if (newStatus === 'friends') {
-      setRequests(prev => prev.filter(r => r.from !== userId));
+    if (newStatus === "friends") {
+      setRequests((prev) => prev.filter((r) => r.from !== userId));
       onRequestHandled();
     }
   };
 
   const dynamicStyles = {
     overlay: {
-      position: 'fixed',
+      position: "fixed",
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1000
+      backgroundColor: "rgba(0, 0, 0, 0.7)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 1000,
     },
     modal: {
       backgroundColor: colors.surface,
-      borderRadius: '10px',
-      width: '90%',
-      maxWidth: '450px',
-      maxHeight: '80vh',
-      display: 'flex',
-      flexDirection: 'column',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+      borderRadius: "10px",
+      width: "90%",
+      maxWidth: "450px",
+      maxHeight: "80vh",
+      display: "flex",
+      flexDirection: "column",
+      boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
     },
     header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '20px',
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "20px",
       borderBottom: `1px solid ${colors.border}`,
-      color: colors.text
+      color: colors.text,
     },
     content: {
-      padding: '20px',
+      padding: "20px",
       flex: 1,
-      overflowY: 'auto'
+      overflowY: "auto",
     },
     loading: {
-      textAlign: 'center',
-      padding: '40px',
-      color: colors.textLighter
+      textAlign: "center",
+      padding: "40px",
+      color: colors.textLighter,
     },
     noRequests: {
-      textAlign: 'center',
-      padding: '40px',
-      color: colors.textLighter
+      textAlign: "center",
+      padding: "40px",
+      color: colors.textLighter,
     },
     requestItem: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '15px',
-      padding: '15px',
-      margin: '10px 0',
+      display: "flex",
+      alignItems: "center",
+      gap: "15px",
+      padding: "15px",
+      margin: "10px 0",
       backgroundColor: colors.surfaceLight,
-      borderRadius: '10px'
+      borderRadius: "10px",
     },
     avatar: {
-      width: '50px',
-      height: '50px',
-      borderRadius: '50%',
-      objectFit: 'cover'
+      width: "50px",
+      height: "50px",
+      borderRadius: "50%",
+      objectFit: "cover",
     },
     avatarPlaceholder: {
-      width: '50px',
-      height: '50px',
-      borderRadius: '50%',
+      width: "50px",
+      height: "50px",
+      borderRadius: "50%",
       backgroundColor: colors.primary,
-      color: 'white',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '20px',
-      fontWeight: 'bold'
+      color: "white",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "20px",
+      fontWeight: "bold",
     },
     requestDetails: {
-      flex: 1
+      flex: 1,
     },
     username: {
-      fontSize: '16px',
-      fontWeight: '600',
-      color: colors.text
+      fontSize: "16px",
+      fontWeight: "600",
+      color: colors.text,
     },
     time: {
-      fontSize: '11px',
+      fontSize: "11px",
       color: colors.textLighter,
-      marginTop: '4px'
-    }
+      marginTop: "4px",
+    },
   };
 
   return (
@@ -136,20 +136,24 @@ const FriendRequests = ({ onClose, onRequestHandled, user, socket }) => {
       <div style={dynamicStyles.modal}>
         <div style={dynamicStyles.header}>
           <h2>Friend Requests</h2>
-          <button onClick={onClose} style={styles.closeButton}>✕</button>
+          <button onClick={onClose} style={styles.closeButton}>
+            ✕
+          </button>
         </div>
-        
+
         <div style={dynamicStyles.content}>
           {loading ? (
             <div style={dynamicStyles.loading}>Loading...</div>
           ) : requests.length === 0 ? (
-            <div style={dynamicStyles.noRequests}>No pending friend requests</div>
+            <div style={dynamicStyles.noRequests}>
+              No pending friend requests
+            </div>
           ) : (
-            requests.map(request => (
+            requests.map((request) => (
               <div key={request._id} style={dynamicStyles.requestItem}>
                 {request.fromProfilePicture ? (
-                  <img 
-                    src={`http://localhost:5000${request.fromProfilePicture}`}
+                  <img
+                    src={`https://uraiyadal-o842.onrender.com${request.fromProfilePicture}`}
                     alt={request.fromUsername}
                     style={dynamicStyles.avatar}
                   />
@@ -159,15 +163,22 @@ const FriendRequests = ({ onClose, onRequestHandled, user, socket }) => {
                   </div>
                 )}
                 <div style={dynamicStyles.requestDetails}>
-                  <div style={dynamicStyles.username}>{request.fromUsername}</div>
+                  <div style={dynamicStyles.username}>
+                    {request.fromUsername}
+                  </div>
                   <div style={dynamicStyles.time}>
                     {new Date(request.createdAt).toLocaleDateString()}
                   </div>
                 </div>
-                <UnifiedFriendButton 
-                  targetUser={{ _id: request.from, username: request.fromUsername }}
+                <UnifiedFriendButton
+                  targetUser={{
+                    _id: request.from,
+                    username: request.fromUsername,
+                  }}
                   user={user}
-                  onStatusChange={(newStatus) => handleFriendStatusChange(request.from, newStatus)}
+                  onStatusChange={(newStatus) =>
+                    handleFriendStatusChange(request.from, newStatus)
+                  }
                   socket={socket}
                 />
               </div>
@@ -181,12 +192,12 @@ const FriendRequests = ({ onClose, onRequestHandled, user, socket }) => {
 
 const styles = {
   closeButton: {
-    background: 'none',
-    border: 'none',
-    fontSize: '24px',
-    cursor: 'pointer',
-    color: '#999'
-  }
+    background: "none",
+    border: "none",
+    fontSize: "24px",
+    cursor: "pointer",
+    color: "#999",
+  },
 };
 
 export default FriendRequests;
