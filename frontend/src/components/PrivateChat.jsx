@@ -19,9 +19,19 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
     isBlockedBy: false,
   });
   const [showUnblockConfirm, setShowUnblockConfirm] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  // Check screen size for mobile
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const checkBlockStatus = async () => {
     try {
@@ -428,14 +438,14 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
 
     if (diffMins < 1) return "Just now";
     if (diffMins < 60)
-      return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
+      return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
     if (diffHours < 24)
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+      return `${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
     return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
   };
 
   const getLastSeenText = () => {
-    if (selectedUser.online) return "🟢 Online";
+    if (selectedUser.online) return "● Online";
     return `Last seen ${formatLastSeen(selectedUser.lastSeen)}`;
   };
 
@@ -500,6 +510,7 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
                 ? colors.messageSentText
                 : colors.messageReceivedText,
               position: "relative",
+              maxWidth: isMobile ? "85%" : "70%",
             }}
           >
             <div style={styles.messageContent}>{msg.content}</div>
@@ -575,6 +586,7 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
     );
   };
 
+  // Mobile responsive dynamic styles
   const dynamicStyles = {
     chatWindow: {
       flex: 1,
@@ -583,7 +595,7 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
       backgroundColor: colors.background,
     },
     chatHeader: {
-      padding: "20px",
+      padding: isMobile ? "12px" : "20px",
       backgroundColor: colors.surface,
       borderBottom: `1px solid ${colors.border}`,
       display: "flex",
@@ -592,18 +604,18 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
     },
     headerName: {
       margin: 0,
-      fontSize: "18px",
+      fontSize: isMobile ? "16px" : "18px",
       color: colors.text,
     },
     headerStatus: {
-      margin: "5px 0 0 0",
-      fontSize: "12px",
+      margin: "4px 0 0 0",
+      fontSize: isMobile ? "10px" : "12px",
       color: colors.textLight,
     },
     messagesArea: {
       flex: 1,
       overflowY: "auto",
-      padding: "20px",
+      padding: isMobile ? "12px" : "20px",
       display: "flex",
       flexDirection: "column",
     },
@@ -611,47 +623,48 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
       textAlign: "center",
       marginTop: "50px",
       color: colors.textLighter,
+      fontSize: isMobile ? "13px" : "14px",
     },
     typingIndicator: {
-      fontSize: "12px",
+      fontSize: isMobile ? "11px" : "12px",
       color: colors.textLight,
       fontStyle: "italic",
-      padding: "10px",
+      padding: isMobile ? "8px" : "10px",
       marginBottom: "10px",
     },
     uploadingIndicator: {
-      fontSize: "12px",
+      fontSize: isMobile ? "11px" : "12px",
       color: colors.primary,
       textAlign: "center",
-      padding: "10px",
+      padding: isMobile ? "8px" : "10px",
     },
     inputForm: {
       display: "flex",
-      padding: "20px",
+      padding: isMobile ? "12px" : "20px",
       backgroundColor: colors.surface,
       borderTop: `1px solid ${colors.border}`,
-      gap: "10px",
+      gap: isMobile ? "8px" : "10px",
     },
     messageInput: {
       flex: 1,
-      padding: "12px",
-      fontSize: "14px",
+      padding: isMobile ? "10px" : "12px",
+      fontSize: isMobile ? "14px" : "14px",
       border: `1px solid ${colors.inputBorder}`,
-      borderRadius: "5px",
+      borderRadius: "20px",
       outline: "none",
       backgroundColor: colors.inputBackground,
       color: colors.text,
     },
     blockedWarning: {
-      padding: "10px",
+      padding: isMobile ? "8px" : "10px",
       backgroundColor: "#ff9800",
       color: "white",
       textAlign: "center",
-      fontSize: "12px",
+      fontSize: isMobile ? "11px" : "12px",
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
-      gap: "10px",
+      gap: isMobile ? "8px" : "10px",
       flexWrap: "wrap",
     },
     blockedWarningButton: {
@@ -662,6 +675,7 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
       cursor: "pointer",
       color: "#ff9800",
       fontWeight: "bold",
+      fontSize: isMobile ? "11px" : "12px",
     },
   };
 
@@ -673,10 +687,10 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
             <img
               src={`https://uraiyadal-o842.onrender.com${selectedUser.profilePicture}`}
               alt={selectedUser.username}
-              style={styles.avatarImage}
+              style={{...styles.avatarImage, width: isMobile ? "40px" : "50px", height: isMobile ? "40px" : "50px"}}
             />
           ) : (
-            <div style={{ ...styles.avatar, backgroundColor: colors.primary }}>
+            <div style={{ ...styles.avatar, backgroundColor: colors.primary, width: isMobile ? "40px" : "50px", height: isMobile ? "40px" : "50px", fontSize: isMobile ? "16px" : "20px" }}>
               {selectedUser.username?.charAt(0).toUpperCase()}
             </div>
           )}
@@ -691,11 +705,13 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
             style={{
               ...styles.clearChatButton,
               backgroundColor: colors.warning,
+              padding: isMobile ? "4px 10px" : "6px 12px",
+              fontSize: isMobile ? "10px" : "12px",
             }}
             disabled={clearingChat || messages.length === 0}
             title="Clear all messages"
           >
-            🗑️ Clear Chat
+            🗑️ Clear
           </button>
           <button onClick={onClose} style={styles.closeButton}>
             ✕
@@ -705,14 +721,13 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
 
       {blockStatus.isBlockedBy && (
         <div style={dynamicStyles.blockedWarning}>
-          ⚠️ You have been blocked by {selectedUser.username}. You cannot send
-          messages.
+          ⚠️ You have been blocked by {selectedUser.username}
         </div>
       )}
 
       {blockStatus.isBlocked && !blockStatus.isBlockedBy && (
         <div style={dynamicStyles.blockedWarning}>
-          🔒 You have blocked {selectedUser.username}.
+          🔒 You blocked {selectedUser.username}
           <button
             onClick={() => setShowUnblockConfirm(true)}
             style={dynamicStyles.blockedWarningButton}
@@ -725,14 +740,13 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
       {showUnblockConfirm && (
         <div style={styles.confirmOverlay}>
           <div
-            style={{ ...styles.confirmModal, backgroundColor: colors.surface }}
+            style={{ ...styles.confirmModal, backgroundColor: colors.surface, width: isMobile ? "85%" : "280px" }}
           >
-            <h4 style={{ color: colors.text }}>
+            <h4 style={{ color: colors.text, fontSize: isMobile ? "16px" : "18px" }}>
               Unblock {selectedUser.username}?
             </h4>
-            <p style={{ color: colors.textLight }}>
-              You will be able to send messages to this user again. Old messages
-              will reappear.
+            <p style={{ color: colors.textLight, fontSize: isMobile ? "12px" : "13px" }}>
+              Old messages will reappear
             </p>
             <div style={styles.confirmButtons}>
               <button
@@ -784,6 +798,13 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
             ...styles.attachButton,
             backgroundColor: colors.surfaceLight,
             color: colors.text,
+            width: isMobile ? "40px" : "44px",
+            height: isMobile ? "40px" : "44px",
+            fontSize: isMobile ? "18px" : "16px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
           disabled={
             uploading || blockStatus.isBlocked || blockStatus.isBlockedBy
@@ -813,7 +834,7 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
           onBlur={() => handleTyping(false)}
           placeholder={
             blockStatus.isBlocked || blockStatus.isBlockedBy
-              ? "Cannot send messages - user is blocked"
+              ? "Blocked"
               : `Message ${selectedUser.username}...`
           }
           style={dynamicStyles.messageInput}
@@ -823,7 +844,13 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
         />
         <button
           type="submit"
-          style={{ ...styles.sendButton, backgroundColor: colors.primary }}
+          style={{
+            ...styles.sendButton,
+            backgroundColor: colors.primary,
+            padding: isMobile ? "10px 16px" : "12px 24px",
+            fontSize: isMobile ? "12px" : "14px",
+            borderRadius: "20px",
+          }}
           disabled={
             uploading ||
             blockStatus.isBlocked ||
@@ -831,7 +858,7 @@ const PrivateChat = ({ user, selectedUser, socket, onClose, onUnblock }) => {
             !messageInput.trim()
           }
         >
-          {uploading ? `${uploadProgress}%` : "Send 📤"}
+          {uploading ? `${uploadProgress}%` : "Send"}
         </button>
       </form>
     </div>
@@ -842,45 +869,39 @@ const styles = {
   headerInfo: {
     display: "flex",
     alignItems: "center",
-    gap: "15px",
+    gap: "12px",
   },
   headerActions: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    gap: "8px",
   },
   avatar: {
-    width: "50px",
-    height: "50px",
     borderRadius: "50%",
     color: "white",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "20px",
     fontWeight: "bold",
   },
   avatarImage: {
-    width: "50px",
-    height: "50px",
     borderRadius: "50%",
     objectFit: "cover",
   },
   clearChatButton: {
-    padding: "6px 12px",
     color: "white",
     border: "none",
     borderRadius: "5px",
     cursor: "pointer",
-    fontSize: "12px",
     transition: "background-color 0.3s",
   },
   closeButton: {
     background: "none",
     border: "none",
-    fontSize: "24px",
+    fontSize: "20px",
     cursor: "pointer",
     color: "#999",
+    padding: "8px",
   },
   noMessagesSub: {
     fontSize: "12px",
@@ -888,14 +909,13 @@ const styles = {
   },
   message: {
     display: "flex",
-    marginBottom: "15px",
+    marginBottom: "12px",
     position: "relative",
   },
   messageBubble: {
-    padding: "10px 15px",
-    borderRadius: "10px",
+    padding: "10px 14px",
+    borderRadius: "12px",
     boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-    maxWidth: "70%",
     position: "relative",
   },
   messageContent: {
@@ -906,16 +926,16 @@ const styles = {
     display: "flex",
     justifyContent: "flex-end",
     alignItems: "center",
-    gap: "8px",
-    marginTop: "5px",
+    gap: "6px",
+    marginTop: "4px",
   },
   messageTime: {
-    fontSize: "10px",
+    fontSize: "9px",
     opacity: 0.7,
   },
   messageStatus: {
-    fontSize: "10px",
-    marginLeft: "5px",
+    fontSize: "9px",
+    marginLeft: "4px",
     opacity: 0.7,
   },
   menuButton: {
@@ -923,7 +943,7 @@ const styles = {
     border: "none",
     cursor: "pointer",
     fontSize: "14px",
-    padding: "2px 5px",
+    padding: "4px 6px",
     borderRadius: "3px",
     transition: "background-color 0.2s",
   },
@@ -947,29 +967,23 @@ const styles = {
     clear: "both",
   },
   deletedMessage: {
-    padding: "8px 12px",
+    padding: "6px 12px",
     borderRadius: "8px",
-    fontSize: "12px",
+    fontSize: "11px",
     fontStyle: "italic",
     textAlign: "center",
-    maxWidth: "200px",
+    maxWidth: "180px",
     margin: "5px auto",
   },
   attachButton: {
-    padding: "12px",
     border: "none",
-    borderRadius: "5px",
     cursor: "pointer",
-    fontSize: "16px",
     transition: "background-color 0.3s",
   },
   sendButton: {
-    padding: "12px 24px",
     color: "white",
     border: "none",
-    borderRadius: "5px",
     cursor: "pointer",
-    fontSize: "14px",
     transition: "background-color 0.3s",
   },
   confirmOverlay: {
@@ -986,14 +1000,13 @@ const styles = {
   },
   confirmModal: {
     padding: "20px",
-    borderRadius: "10px",
+    borderRadius: "12px",
     textAlign: "center",
-    minWidth: "280px",
   },
   confirmButtons: {
     display: "flex",
     gap: "10px",
-    marginTop: "20px",
+    marginTop: "15px",
     justifyContent: "center",
   },
   cancelButton: {
@@ -1001,7 +1014,7 @@ const styles = {
     backgroundColor: "#999",
     color: "white",
     border: "none",
-    borderRadius: "5px",
+    borderRadius: "8px",
     cursor: "pointer",
   },
   confirmUnblockButton: {
@@ -1009,7 +1022,7 @@ const styles = {
     backgroundColor: "#4CAF50",
     color: "white",
     border: "none",
-    borderRadius: "5px",
+    borderRadius: "8px",
     cursor: "pointer",
   },
 };

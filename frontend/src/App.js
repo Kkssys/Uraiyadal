@@ -34,6 +34,8 @@ function App() {
   const [activeFriendMenu, setActiveFriendMenu] = useState(null);
   const [unreadRequestCount, setUnreadRequestCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   // Chat states
   const [messages, setMessages] = useState([]);
@@ -43,7 +45,30 @@ function App() {
   const [typingUsers, setTypingUsers] = useState([]);
   const messagesEndRef = useRef(null);
 
-  // Simulate loading or wait for auth check
+  // Check screen size for mobile
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+      if (window.innerWidth > 768) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isMobile && isMobileMenuOpen && !event.target.closest('.mobile-sidebar')) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isMobile, isMobileMenuOpen]);
+
+  // Simulate loading
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
@@ -63,9 +88,9 @@ function App() {
     const diffDays = Math.floor(diffMs / 86400000);
     
     if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hr ago`;
+    return `${diffDays} day ago`;
   };
 
   // Fetch friends list
@@ -128,13 +153,15 @@ function App() {
     await fetchFriends();
   };
 
-  // Setup socket connection when user logs in
+  // Setup socket connection
   useEffect(() => {
     if (token && user) {
       fetchFriends();
       fetchUnreadRequests();
       
-      const newSocket = io('https://uraiyadal-o842.onrender.com' || 'http://localhost:5000', {
+      const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+      
+      const newSocket = io(SOCKET_URL, {
         auth: { token },
         transports: ['polling', 'websocket']
       });
@@ -239,7 +266,7 @@ function App() {
     delete axios.defaults.headers.common['Authorization'];
   };
 
-  // Show loading screen while checking auth
+  // Show loading screen
   if (isLoading) {
     return <LoadingScreen />;
   }
@@ -260,7 +287,91 @@ function App() {
   if (token && user) {
     const onlineCount = friends.filter(f => f.online).length;
     
-    const dynamicStyles = {
+    // Updated mobile responsive styles
+    const mobileStyles = {
+      container: {
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        backgroundColor: colors.background,
+        position: 'relative'
+      },
+      sidebar: {
+        position: 'fixed',
+        top: 0,
+        left: isMobileMenuOpen ? 0 : '-85%',
+        width: '85%',
+        maxWidth: '300px',
+        height: '100%',
+        backgroundColor: colors.surface,
+        boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
+        transition: 'left 0.3s ease-in-out',
+        zIndex: 1001,
+        display: 'flex',
+        flexDirection: 'column'
+      },
+      mobileHeader: {
+        display: 'flex',
+        padding: '12px 15px',
+        backgroundColor: colors.surface,
+        borderBottom: `1px solid ${colors.border}`,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10
+      },
+      menuButton: {
+        background: 'none',
+        border: 'none',
+        fontSize: '24px',
+        cursor: 'pointer',
+        color: colors.text,
+        padding: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      },
+      overlay: {
+        display: isMobileMenuOpen ? 'block' : 'none',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 1000
+      },
+      chatArea: {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: colors.background,
+        width: '100%'
+      },
+      chatHeader: {
+        padding: '12px 15px',
+        backgroundColor: colors.surface,
+        borderBottom: `1px solid ${colors.border}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+      },
+      backButton: {
+        background: 'none',
+        border: 'none',
+        fontSize: '20px',
+        cursor: 'pointer',
+        color: colors.text,
+        padding: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }
+    };
+
+    // Desktop styles
+    const desktopStyles = {
       container: {
         display: 'flex',
         height: '100vh',
@@ -272,30 +383,6 @@ function App() {
         borderRight: `1px solid ${colors.border}`,
         display: 'flex',
         flexDirection: 'column'
-      },
-      userInfo: {
-        padding: '20px',
-        borderBottom: `1px solid ${colors.border}`,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      },
-      friendsList: {
-        flex: 1,
-        padding: '20px',
-        overflowY: 'auto'
-      },
-      friendItem: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '12px',
-        margin: '8px 0',
-        backgroundColor: colors.surfaceLight,
-        borderRadius: '10px',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        position: 'relative'
       },
       chatArea: {
         flex: 1,
@@ -313,137 +400,184 @@ function App() {
       }
     };
 
+    const currentStyles = isMobile ? mobileStyles : desktopStyles;
+
     return (
-      <div style={dynamicStyles.container}>
-        {/* Sidebar */}
-        <div style={dynamicStyles.sidebar}>
-          <div style={dynamicStyles.userInfo}>
-            <div style={styles.userAvatar}>
+      <>
+        {isMobile && (
+          <>
+            {isMobileMenuOpen && <div style={mobileStyles.overlay} onClick={() => setIsMobileMenuOpen(false)} />}
+            <div style={mobileStyles.mobileHeader}>
+              <button style={mobileStyles.menuButton} onClick={() => setIsMobileMenuOpen(true)}>
+                ☰
+              </button>
               <div style={styles.headerLogo}>
-                <img src="/logo-64x64.png" alt="Uraiyadal" style={styles.headerLogoImage} />
+                <img src="/logo-32x32.png" alt="Uraiyadal" style={styles.headerLogoImage} />
               </div>
-              {user.profilePicture ? (
-                <img 
-                  src={`https://uraiyadal-o842.onrender.com${user.profilePicture}`} 
-                  alt={user.username}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <div style={styles.avatarPlaceholder}>
-                  {user.username.charAt(0).toUpperCase()}
+              <div style={{ width: '40px' }} />
+            </div>
+          </>
+        )}
+        
+        <div style={currentStyles.container}>
+          {/* Sidebar */}
+          <div style={currentStyles.sidebar} className="mobile-sidebar">
+            <div style={styles.userInfo}>
+              <div style={styles.userAvatar}>
+                <div style={styles.headerLogo}>
+                  <img src="/logo-32x32.png" alt="Uraiyadal" style={styles.headerLogoImage} />
                 </div>
-              )}
-              <h3 style={{ color: colors.text }}>{user.username}</h3>
-            </div>
-            <div style={styles.userActions}>
-              <NotificationBell socket={socket} />
-              <MenuDropdown 
-                onOpenAddFriend={() => setShowAddFriend(true)}
-                onOpenFriendRequests={() => setShowFriendRequests(true)}
-                onOpenSettings={() => setShowSettings(true)}
-                onOpenBlockedUsers={() => setShowBlockedUsers(true)}
-                onLogout={handleLogout}
-                unreadCount={unreadRequestCount}
-              />
-            </div>
-          </div>
-          
-          {/* Friends List */}
-          <div style={dynamicStyles.friendsList}>
-            <h4 style={{ color: colors.text }}>Friends ({friends.length}) 🟢 {onlineCount} online</h4>
-            {friends.length === 0 ? (
-              <div style={styles.noFriends}>
-                <p style={{ color: colors.textLighter }}>No friends yet</p>
-                <p style={styles.noFriendsSub}>Click the menu (☰) to add friends</p>
+                {user.profilePicture ? (
+                  <img 
+                    src={`http://localhost:5000${user.profilePicture}`} 
+                    alt={user.username}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <div style={styles.avatarPlaceholder}>
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <h3 style={{ color: colors.text, fontSize: isMobile ? '14px' : '16px' }}>{user.username}</h3>
               </div>
-            ) : (
-              friends.map(friend => (
-                <div 
-                  key={friend._id} 
-                  style={{
-                    ...dynamicStyles.friendItem,
-                    ...(selectedUser?._id === friend._id ? styles.selectedFriend : {})
-                  }}
-                >
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px' }} onClick={() => setSelectedUser(friend)}>
+              <div style={styles.userActions}>
+                <NotificationBell socket={socket} />
+                <MenuDropdown 
+                  onOpenAddFriend={() => setShowAddFriend(true)}
+                  onOpenFriendRequests={() => setShowFriendRequests(true)}
+                  onOpenSettings={() => setShowSettings(true)}
+                  onOpenBlockedUsers={() => setShowBlockedUsers(true)}
+                  onLogout={handleLogout}
+                  unreadCount={unreadRequestCount}
+                />
+              </div>
+            </div>
+            
+            {/* Friends List */}
+            <div style={styles.friendsList}>
+              <h4 style={{ color: colors.text, fontSize: isMobile ? '12px' : '14px' }}>
+                Friends ({friends.length}) 🟢 {onlineCount} online
+              </h4>
+              {friends.length === 0 ? (
+                <div style={styles.noFriends}>
+                  <p style={{ color: colors.textLighter }}>No friends yet</p>
+                  <p style={styles.noFriendsSub}>Click the menu (☰) to add friends</p>
+                </div>
+              ) : (
+                friends.map(friend => (
+                  <div 
+                    key={friend._id} 
+                    style={{
+                      ...styles.friendItem,
+                      padding: isMobile ? '10px' : '12px',
+                      ...(selectedUser?._id === friend._id ? styles.selectedFriend : {})
+                    }}
+                    onClick={() => {
+                      setSelectedUser(friend);
+                      if (isMobile) setIsMobileMenuOpen(false);
+                    }}
+                  >
                     {friend.profilePicture ? (
                       <img 
-                        src={`https://uraiyadal-o842.onrender.com${friend.profilePicture}`}
+                        src={`http://localhost:5000${friend.profilePicture}`}
                         alt={friend.username}
-                        style={styles.friendAvatar}
+                        style={{...styles.friendAvatar, width: isMobile ? '40px' : '50px', height: isMobile ? '40px' : '50px'}}
                       />
                     ) : (
-                      <div style={styles.friendAvatarPlaceholder}>
+                      <div style={{...styles.friendAvatarPlaceholder, width: isMobile ? '40px' : '50px', height: isMobile ? '40px' : '50px'}}>
                         {friend.username.charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div style={styles.friendInfo}>
                       <div>
-                        <div style={{ color: colors.text, fontSize: '16px', fontWeight: '600' }}>{friend.username}</div>
-                        <div style={{ color: colors.textLighter, fontSize: '11px', marginTop: '2px' }}>{friend.email}</div>
-                        <div style={{ fontSize: '11px', marginTop: '4px' }}>
+                        <div style={{ color: colors.text, fontSize: isMobile ? '14px' : '16px', fontWeight: '600' }}>
+                          {friend.username}
+                        </div>
+                        {!isMobile && <div style={{ color: colors.textLighter, fontSize: '11px', marginTop: '2px' }}>{friend.email}</div>}
+                        <div style={{ fontSize: isMobile ? '10px' : '11px', marginTop: '4px' }}>
                           {friend.online ? (
-                            <span style={{ color: colors.success }}>🟢 Online</span>
+                            <span style={{ color: colors.success }}>● Online</span>
                           ) : (
-                            <span style={{ color: colors.textLighter }}>⚫ Last seen {formatLastSeen(friend.lastSeen)}</span>
+                            <span style={{ color: colors.textLighter }}>● {formatLastSeen(friend.lastSeen)}</span>
                           )}
                         </div>
                       </div>
                       {friend.online && <span style={styles.onlineDot}></span>}
                     </div>
+                    <button 
+                      style={styles.menuButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveFriendMenu(activeFriendMenu === friend._id ? null : friend._id);
+                      }}
+                    >
+                      ⋮
+                    </button>
+                    {activeFriendMenu === friend._id && (
+                      <FriendMenu 
+                        friend={friend}
+                        onClose={() => setActiveFriendMenu(null)}
+                        onRemoveFriend={handleRemoveFriend}
+                        onBlockUser={handleBlockUser}
+                      />
+                    )}
                   </div>
-                  <button 
-                    style={styles.menuButton}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveFriendMenu(activeFriendMenu === friend._id ? null : friend._id);
-                    }}
-                  >
-                    ⋮
-                  </button>
-                  {activeFriendMenu === friend._id && (
-                    <FriendMenu 
-                      friend={friend}
-                      onClose={() => setActiveFriendMenu(null)}
-                      onRemoveFriend={handleRemoveFriend}
-                      onBlockUser={handleBlockUser}
-                    />
-                  )}
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Chat Area */}
+          <div style={currentStyles.chatArea}>
+            <div style={currentStyles.chatHeader}>
+              {selectedUser && isMobile && (
+                <button style={mobileStyles.backButton} onClick={() => setSelectedUser(null)}>
+                  ←
+                </button>
+              )}
+              <div style={styles.welcomeLogo}>
+                <img src="/logo-48x48.png" alt="Uraiyadal" style={{...styles.welcomeLogoImage, width: isMobile ? '32px' : '48px', height: isMobile ? '32px' : '48px'}} />
+              </div>
+              <div style={{ flex: 1 }}>
+                {selectedUser ? (
+                  <>
+                    <h2 style={{ color: colors.text, fontSize: isMobile ? '16px' : '24px', margin: 0 }}>
+                      {selectedUser.username}
+                    </h2>
+                    <p style={{ color: colors.textLight, fontSize: isMobile ? '10px' : '12px', margin: '4px 0 0 0' }}>
+                      {selectedUser.online ? '● Online' : `Last seen ${formatLastSeen(selectedUser.lastSeen)}`}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 style={{ color: colors.text, fontSize: isMobile ? '18px' : '24px', margin: 0 }}>Uraiyadal</h2>
+                    <p style={{ color: colors.textLight, fontSize: isMobile ? '11px' : '14px', margin: '4px 0 0 0' }}>
+                      Select a friend to start chatting
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {selectedUser ? (
+              <PrivateChat 
+                user={user}
+                selectedUser={selectedUser}
+                socket={socket}
+                onClose={() => setSelectedUser(null)}
+                onUnblock={handleUnblockFromChat}
+              />
+            ) : (
+              <div style={styles.noChatSelected}>
+                <div style={{ textAlign: 'center', color: colors.textLighter, padding: '20px' }}>
+                  <p>👋 Welcome, {user.username}!</p>
+                  <p>Tap the menu (☰) to add friends</p>
+                  <p>Select a friend to start chatting</p>
                 </div>
-              ))
+              </div>
             )}
           </div>
         </div>
-
-        {/* Chat Area */}
-        {selectedUser ? (
-          <PrivateChat 
-            user={user}
-            selectedUser={selectedUser}
-            socket={socket}
-            onClose={() => setSelectedUser(null)}
-            onUnblock={handleUnblockFromChat}
-          />
-        ) : (
-          <div style={dynamicStyles.chatArea}>
-            <div style={dynamicStyles.chatHeader}>
-              <div style={styles.welcomeLogo}>
-                <img src="/favicon-96x96.png" alt="Uraiyadal" style={styles.welcomeLogoImage} />
-              </div>
-              <div>
-                <h2 style={{ color: colors.text }}>Uraiyadal</h2>
-                <p style={{ color: colors.textLight }}>Select a friend to start chatting</p>
-              </div>
-            </div>
-            <div style={styles.noChatSelected}>
-              <div style={{ textAlign: 'center', color: colors.textLighter }}>
-                <p>👋 Welcome, {user.username} to Uraiyadal!!</p>
-                {/* <p>Click the menu (☰) to add friends</p>
-                <p>Once added, select a friend to start chatting</p> */}
-              </div>
-            </div>
-          </div>
-        )}
         
         {/* Modals */}
         {showSettings && (
@@ -486,31 +620,35 @@ function App() {
             onUnblock={handleUnblock}
           />
         )}
-      </div>
+      </>
     );
   }
 
+  // Login/Register styles
   const loginStyles = {
     container: {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      height: '100vh',
+      minHeight: '100vh',
       padding: '20px',
       background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`
     },
     card: {
       backgroundColor: colors.surface,
-      padding: '40px',
-      borderRadius: '10px',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+      padding: window.innerWidth <= 480 ? '25px' : '35px',
+      borderRadius: '15px',
+      boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
       width: '100%',
-      maxWidth: '400px'
+      maxWidth: window.innerWidth <= 480 ? '90%' : '400px'
     },
     title: {
       textAlign: 'center',
-      marginBottom: '30px',
-      color: colors.text
+      marginBottom: window.innerWidth <= 480 ? '20px' : '25px',
+      marginTop: '5px',
+      color: colors.text,
+      fontSize: window.innerWidth <= 480 ? '22px' : '26px',
+      fontWeight: 'bold'
     }
   };
 
@@ -518,7 +656,7 @@ function App() {
     <div style={loginStyles.container}>
       <div style={loginStyles.card}>
         <div style={styles.loginLogo}>
-          <img src="/favicon-192x192.png" alt="Uraiyadal" style={styles.loginLogoImage} />
+          <img src="/logo-64x64.png" alt="Uraiyadal" style={{...styles.loginLogoImage, width: window.innerWidth <= 480 ? '70px' : '90px', height: window.innerWidth <= 480 ? '70px' : '90px'}} />
         </div>
         <h1 style={loginStyles.title}>Uraiyadal</h1>
         
@@ -562,7 +700,9 @@ function App() {
                 ...styles.input,
                 backgroundColor: colors.inputBackground,
                 borderColor: colors.inputBorder,
-                color: colors.text
+                color: colors.text,
+                fontSize: window.innerWidth <= 480 ? '14px' : '16px',
+                padding: window.innerWidth <= 480 ? '12px' : '14px'
               }}
               required
             />
@@ -575,12 +715,14 @@ function App() {
                 ...styles.input,
                 backgroundColor: colors.inputBackground,
                 borderColor: colors.inputBorder,
-                color: colors.text
+                color: colors.text,
+                fontSize: window.innerWidth <= 480 ? '14px' : '16px',
+                padding: window.innerWidth <= 480 ? '12px' : '14px'
               }}
               required
             />
-            <button type="submit" style={{ ...styles.button, backgroundColor: colors.primary }}>
-              Login 
+            <button type="submit" style={{ ...styles.button, backgroundColor: colors.primary, fontSize: window.innerWidth <= 480 ? '15px' : '16px', padding: window.innerWidth <= 480 ? '12px' : '14px' }}>
+              Login 🔐
             </button>
           </form>
         ) : (
@@ -594,7 +736,9 @@ function App() {
                 ...styles.input,
                 backgroundColor: colors.inputBackground,
                 borderColor: colors.inputBorder,
-                color: colors.text
+                color: colors.text,
+                fontSize: window.innerWidth <= 480 ? '14px' : '16px',
+                padding: window.innerWidth <= 480 ? '12px' : '14px'
               }}
               required
             />
@@ -607,7 +751,9 @@ function App() {
                 ...styles.input,
                 backgroundColor: colors.inputBackground,
                 borderColor: colors.inputBorder,
-                color: colors.text
+                color: colors.text,
+                fontSize: window.innerWidth <= 480 ? '14px' : '16px',
+                padding: window.innerWidth <= 480 ? '12px' : '14px'
               }}
               required
             />
@@ -620,25 +766,18 @@ function App() {
                 ...styles.input,
                 backgroundColor: colors.inputBackground,
                 borderColor: colors.inputBorder,
-                color: colors.text
+                color: colors.text,
+                fontSize: window.innerWidth <= 480 ? '14px' : '16px',
+                padding: window.innerWidth <= 480 ? '12px' : '14px'
               }}
               required
               minLength="6"
             />
-            <button type="submit" style={{ ...styles.button, backgroundColor: colors.primary }}>
-              Register 
+            <button type="submit" style={{ ...styles.button, backgroundColor: colors.primary, fontSize: window.innerWidth <= 480 ? '15px' : '16px', padding: window.innerWidth <= 480 ? '12px' : '14px' }}>
+              Register ✨
             </button>
           </form>
         )}
-{/*         
-        <div style={{ ...styles.infoText, color: colors.textLighter }}>
-          <p>🔐 Secure OTP verification</p>
-          <p>💬 Real-time private messaging</p>
-          <p>👥 Send friend requests to chat</p>
-          <p>🚫 Block unwanted users</p>
-          <p>🔔 Real-time notifications</p>
-          <p>🌙 Dark mode support</p>
-        </div> */}
       </div>
     </div>
   );
@@ -647,20 +786,22 @@ function App() {
 const styles = {
   toggleButtons: {
     display: 'flex',
-    gap: '10px',
-    marginBottom: '20px'
+    gap: '12px',
+    marginBottom: '25px'
   },
   toggleButton: {
     flex: 1,
-    padding: '10px',
+    padding: '12px',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '10px',
     cursor: 'pointer',
     fontSize: '16px',
-    transition: 'all 0.3s'
+    fontWeight: '500',
+    transition: 'all 0.3s ease'
   },
   activeToggle: {
-    color: 'white'
+    color: 'white',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
   },
   form: {
     display: 'flex',
@@ -668,40 +809,33 @@ const styles = {
     gap: '15px'
   },
   input: {
-    padding: '12px',
-    fontSize: '16px',
-    border: '1px solid',
-    borderRadius: '5px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderRadius: '10px',
     outline: 'none',
-    transition: 'all 0.3s'
+    transition: 'all 0.3s ease'
   },
   button: {
-    padding: '12px',
-    fontSize: '16px',
     color: 'white',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '10px',
     cursor: 'pointer',
-    transition: 'all 0.3s'
+    fontWeight: '500',
+    transition: 'all 0.3s ease'
   },
   error: {
     backgroundColor: '#fee',
     color: '#c33',
     padding: '10px',
-    borderRadius: '5px',
+    borderRadius: '8px',
     marginBottom: '15px',
-    textAlign: 'center'
-  },
-  infoText: {
-    marginTop: '20px',
     textAlign: 'center',
-    fontSize: '12px',
-    lineHeight: '1.8'
+    fontSize: '14px'
   },
   userAvatar: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
+    gap: '12px',
     flex: 1
   },
   userActions: {
@@ -727,42 +861,44 @@ const styles = {
     fontSize: '20px',
     fontWeight: 'bold'
   },
-  noFriends: {
-    textAlign: 'center',
-    padding: '40px 20px'
+  friendsList: {
+    flex: 1,
+    padding: '15px',
+    overflowY: 'auto'
   },
-  noFriendsSub: {
-    fontSize: '12px',
-    marginTop: '10px',
-    color: '#999'
-  },
-  selectedFriend: {
-    backgroundColor: '#e3f2fd',
-    borderLeft: '3px solid #667eea'
-  },
-  friendAvatar: {
-    width: '50px',
-    height: '50px',
-    borderRadius: '50%',
-    objectFit: 'cover'
-  },
-  friendAvatarPlaceholder: {
-    width: '50px',
-    height: '50px',
-    borderRadius: '50%',
-    backgroundColor: '#667eea',
-    color: 'white',
+  friendItem: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '20px',
-    fontWeight: 'bold'
+    gap: '12px',
+    margin: '8px 0',
+    backgroundColor: '#f9f9f9',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    position: 'relative'
   },
   friendInfo: {
     flex: 1,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center'
+  },
+  friendAvatar: {
+    borderRadius: '50%',
+    objectFit: 'cover'
+  },
+  friendAvatarPlaceholder: {
+    borderRadius: '50%',
+    backgroundColor: '#667eea',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 'bold'
+  },
+  selectedFriend: {
+    backgroundColor: '#e3f2fd',
+    borderLeft: '3px solid #667eea'
   },
   onlineDot: {
     width: '10px',
@@ -779,8 +915,17 @@ const styles = {
     fontSize: '18px',
     color: '#999',
     padding: '8px',
-    borderRadius: '5px',
+    borderRadius: '8px',
     zIndex: 10
+  },
+  noFriends: {
+    textAlign: 'center',
+    padding: '40px 20px'
+  },
+  noFriendsSub: {
+    fontSize: '12px',
+    marginTop: '10px',
+    color: '#999'
   },
   noChatSelected: {
     flex: 1,
@@ -788,34 +933,38 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center'
   },
-  // Logo styles with proper ratios
-  // headerLogo: {
-  //   marginRight: '5px'
-  // },
+  // Logo styles
+  headerLogo: {
+    marginRight: '5px'
+  },
   headerLogoImage: {
-    width: '50px',
-    height: '50px',
+    width: '32px',
+    height: '32px',
     borderRadius: '8px',
     objectFit: 'contain'
   },
   loginLogo: {
     textAlign: 'center',
-    // marginBottom: '20px'
+    marginTop: '-10px',
+    marginBottom: '5px'
   },
   loginLogoImage: {
-    width: '200px',
-    height: '200px',
-    borderRadius: '16px',
+    borderRadius: '20px',
     objectFit: 'contain'
   },
   welcomeLogo: {
-    marginRight: '1px'
+    marginRight: '10px'
   },
   welcomeLogoImage: {
-    width: '50px',
-    height: '50px',
     borderRadius: '12px',
-    // 
+    objectFit: 'contain'
+  },
+  userInfo: {
+    padding: '15px',
+    borderBottom: '1px solid #e0e0e0',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
   }
 };
 
