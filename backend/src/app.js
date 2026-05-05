@@ -15,19 +15,18 @@ const { sendOTPEmail } = require('./utils/emailService');
 // Create express app
 const app = express();
 
-// ========== CORS CONFIGURATION - FIXED FOR NETLIFY ==========
-// Simple CORS configuration that works with any frontend
+// ========== CORS CONFIGURATION ==========
 app.use(cors({
-  origin: true,  // This reflects the request origin (works with Netlify)
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// Handle preflight requests for all routes
+// Handle preflight requests
 app.options('*', cors());
 
-// Debug middleware to log incoming requests
+// Debug middleware
 app.use((req, res, next) => {
   console.log(`📨 ${req.method} ${req.path} from origin: ${req.headers.origin || 'same-origin'}`);
   next();
@@ -38,7 +37,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ========== MULTER CONFIGURATION ==========
-// Configure multer for profile picture uploads
 const profileStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = path.join(__dirname, '../uploads');
@@ -71,7 +69,6 @@ const uploadProfile = multer({
   fileFilter: profileFileFilter
 });
 
-// Configure multer for media uploads
 const mediaStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = path.join(__dirname, '../uploads/media');
@@ -105,11 +102,11 @@ const uploadMedia = multer({
   fileFilter: mediaFileFilter
 });
 
-// ========== STATIC FILES ==========
+// Serve static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads/media', express.static(path.join(__dirname, '../uploads/media')));
 
-// ========== TEST ROUTES ==========
+// Test routes
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is working!' });
 });
@@ -127,7 +124,6 @@ app.get('/api/test-auth', authMiddleware, (req, res) => {
 
 // ========== AUTH ROUTES ==========
 
-// Register - Send OTP
 app.post('/api/register', async (req, res) => {
   console.log('='.repeat(50));
   console.log('📝 Registration attempt:', req.body.email);
@@ -197,7 +193,6 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Verify OTP
 app.post('/api/verify-otp', async (req, res) => {
   console.log('🔐 OTP verification attempt:', req.body.email);
   
@@ -248,7 +243,6 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
-// Resend OTP
 app.post('/api/resend-otp', async (req, res) => {
   console.log('📧 Resend OTP request for:', req.body.email);
   
@@ -283,7 +277,6 @@ app.post('/api/resend-otp', async (req, res) => {
   }
 });
 
-// Login
 app.post('/api/login', async (req, res) => {
   console.log('🔐 Login attempt:', req.body.email);
   
@@ -337,7 +330,6 @@ app.post('/api/login', async (req, res) => {
 
 // ========== FRIEND ROUTES ==========
 
-// Get friends list (excluding blocked users)
 app.get('/api/friends', authMiddleware, async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
@@ -359,7 +351,6 @@ app.get('/api/friends', authMiddleware, async (req, res) => {
   }
 });
 
-// Get friend requests
 app.get('/api/friend-requests', authMiddleware, async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
@@ -376,7 +367,6 @@ app.get('/api/friend-requests', authMiddleware, async (req, res) => {
   }
 });
 
-// Search users to send friend request
 app.get('/api/search-new-users', authMiddleware, async (req, res) => {
   try {
     const { search } = req.query;
@@ -420,7 +410,7 @@ app.get('/api/search-new-users', authMiddleware, async (req, res) => {
   }
 });
 
-// Send friend request
+// Updated Send Friend Request Route with better error handling
 app.post('/api/send-friend-request', authMiddleware, async (req, res) => {
   try {
     console.log('📨 Send friend request - Body:', req.body);
@@ -436,34 +426,63 @@ app.post('/api/send-friend-request', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
     
+    console.log(`📨 From user: ${req.user.username} (${req.user._id})`);
+    console.log(`📨 To user ID: ${userId}`);
+    
+    // Check if trying to send request to self
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ error: 'Cannot send friend request to yourself' });
+    }
+    
+    // Check if sender has blocked the recipient
     if ((req.user.blockedUsers || []).includes(userId)) {
-      return res.status(400).json({ error: 'Cannot send request to blocked user' });
+      return res.status(400).json({ error: 'You have blocked this user' });
     }
     
     const recipient = await User.findById(userId);
     if (!recipient) {
+      console.log('❌ Recipient not found');
       return res.status(404).json({ error: 'User not found' });
     }
     
+    console.log(`📨 Recipient found: ${recipient.username}`);
+    
+    // Check if recipient has blocked the sender
     if ((recipient.blockedUsers || []).includes(req.user._id.toString())) {
       return res.status(400).json({ error: 'You are blocked by this user' });
     }
     
+    // Check if already friends
     if ((req.user.friends || []).includes(userId)) {
+      console.log('❌ Already friends');
       return res.status(400).json({ error: 'Already friends with this user' });
     }
     
+    // Check if request already sent from sender to recipient
     const existingRequest = (recipient.friendRequests || []).find(
       r => r && r.from && r.from.toString() === req.user._id.toString() && r.status === 'pending'
     );
     
     if (existingRequest) {
+      console.log('❌ Request already sent');
       return res.status(400).json({ error: 'Friend request already sent' });
     }
     
+    // Check if request already received from recipient to sender
+    const receivedRequest = (req.user.friendRequests || []).find(
+      r => r && r.from && r.from.toString() === userId && r.status === 'pending'
+    );
+    
+    if (receivedRequest) {
+      console.log('❌ You already have a pending request from this user');
+      return res.status(400).json({ error: 'You already have a pending request from this user. Please accept or reject it first.' });
+    }
+    
+    // Initialize arrays if they don't exist
     if (!recipient.friendRequests) recipient.friendRequests = [];
     if (!recipient.notifications) recipient.notifications = [];
     
+    // Add friend request to recipient
     recipient.friendRequests.push({
       from: req.user._id,
       fromUsername: req.user.username,
@@ -472,6 +491,7 @@ app.post('/api/send-friend-request', authMiddleware, async (req, res) => {
       createdAt: new Date()
     });
     
+    // Add notification for recipient
     recipient.notifications.push({
       type: 'friend_request',
       from: req.user._id,
@@ -485,14 +505,16 @@ app.post('/api/send-friend-request', authMiddleware, async (req, res) => {
     await recipient.save();
     
     console.log('✅ Friend request sent successfully');
-    res.json({ message: 'Friend request sent successfully' });
+    res.json({ 
+      message: 'Friend request sent successfully',
+      requestId: recipient.friendRequests[recipient.friendRequests.length - 1]._id
+    });
   } catch (error) {
     console.error('❌ Error sending friend request:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Accept friend request
 app.post('/api/accept-friend-request', authMiddleware, async (req, res) => {
   try {
     console.log('✅ Accept friend request - Body:', req.body);
@@ -559,7 +581,6 @@ app.post('/api/accept-friend-request', authMiddleware, async (req, res) => {
   }
 });
 
-// Reject friend request
 app.post('/api/reject-friend-request', authMiddleware, async (req, res) => {
   try {
     const { requestId } = req.body;
@@ -590,7 +611,6 @@ app.post('/api/reject-friend-request', authMiddleware, async (req, res) => {
   }
 });
 
-// Remove friend
 app.delete('/api/remove-friend/:friendId', authMiddleware, async (req, res) => {
   try {
     const { friendId } = req.params;
@@ -617,18 +637,12 @@ app.delete('/api/remove-friend/:friendId', authMiddleware, async (req, res) => {
 
 // ========== BLOCK/UNBLOCK ROUTES ==========
 
-// Block user
 app.post('/api/block-user/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    console.log('🚫 Block user request received');
-    console.log('req.user:', req.user ? req.user._id : 'No user');
-    console.log('userId param:', userId);
-    
     if (!req.user || !req.user._id) {
-      console.error('❌ Authentication failed - no user in request');
-      return res.status(401).json({ error: 'Authentication failed. Please login again.' });
+      return res.status(401).json({ error: 'Authentication failed' });
     }
     
     if (userId === req.user._id.toString()) {
@@ -640,35 +654,19 @@ app.post('/api/block-user/:userId', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    console.log(`Blocking user: ${userToBlock.username} by ${req.user.username}`);
-    
     if (!req.user.blockedUsers) req.user.blockedUsers = [];
     if (!userToBlock.blockedBy) userToBlock.blockedBy = [];
-    if (!req.user.friends) req.user.friends = [];
-    if (!userToBlock.friends) userToBlock.friends = [];
-    if (!req.user.friendRequests) req.user.friendRequests = [];
-    if (!userToBlock.friendRequests) userToBlock.friendRequests = [];
-    if (!userToBlock.notifications) userToBlock.notifications = [];
     
     if (req.user.blockedUsers.includes(userId)) {
       return res.status(400).json({ error: 'User already blocked' });
     }
     
-    // Remove from friends using splice for safety
-    const friendIndex = req.user.friends.indexOf(userId);
-    if (friendIndex !== -1) {
-      req.user.friends.splice(friendIndex, 1);
-    }
-    
-    const friendIndexOther = userToBlock.friends.indexOf(req.user._id.toString());
-    if (friendIndexOther !== -1) {
-      userToBlock.friends.splice(friendIndexOther, 1);
-    }
+    req.user.friends = (req.user.friends || []).filter(id => id && id.toString() !== userId);
+    userToBlock.friends = (userToBlock.friends || []).filter(id => id && id.toString() !== req.user._id.toString());
     
     req.user.blockedUsers.push(userId);
     userToBlock.blockedBy.push(req.user._id);
     
-    // Safe filtering of friend requests
     if (req.user.friendRequests && req.user.friendRequests.length > 0) {
       req.user.friendRequests = req.user.friendRequests.filter(req => {
         return req && req.from && req.from.toString() !== userId;
@@ -681,6 +679,7 @@ app.post('/api/block-user/:userId', authMiddleware, async (req, res) => {
       });
     }
     
+    if (!userToBlock.notifications) userToBlock.notifications = [];
     userToBlock.notifications.push({
       type: 'user_blocked',
       from: req.user._id,
@@ -703,28 +702,16 @@ app.post('/api/block-user/:userId', authMiddleware, async (req, res) => {
       });
     }
     
-    console.log('✅ User blocked successfully');
-    res.json({ 
-      message: 'User blocked successfully',
-      blockedUser: {
-        id: userToBlock._id,
-        username: userToBlock.username
-      }
-    });
+    res.json({ message: 'User blocked successfully' });
   } catch (error) {
-    console.error('❌ Error blocking user:', error);
+    console.error('Error blocking user:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Unblock user
 app.delete('/api/unblock-user/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
-    
-    console.log('🔓 Unblock user request received');
-    console.log('req.user:', req.user ? req.user._id : 'No user');
-    console.log('userId param:', userId);
     
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: 'Authentication failed' });
@@ -768,15 +755,13 @@ app.delete('/api/unblock-user/:userId', authMiddleware, async (req, res) => {
       });
     }
     
-    console.log('✅ User unblocked successfully');
     res.json({ message: 'User unblocked successfully' });
   } catch (error) {
-    console.error('❌ Error unblocking user:', error);
+    console.error('Error unblocking user:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get blocked users list
 app.get('/api/blocked-users', authMiddleware, async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
@@ -794,7 +779,6 @@ app.get('/api/blocked-users', authMiddleware, async (req, res) => {
   }
 });
 
-// Check if user is blocked
 app.get('/api/check-blocked/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -815,7 +799,6 @@ app.get('/api/check-blocked/:userId', authMiddleware, async (req, res) => {
 
 // ========== NOTIFICATION ROUTES ==========
 
-// Get notifications
 app.get('/api/notifications', authMiddleware, async (req, res) => {
   try {
     const notifications = req.user.notifications || [];
@@ -828,7 +811,6 @@ app.get('/api/notifications', authMiddleware, async (req, res) => {
   }
 });
 
-// Mark notification as read
 app.put('/api/mark-notification-read/:notificationId', authMiddleware, async (req, res) => {
   try {
     const { notificationId } = req.params;
@@ -851,7 +833,6 @@ app.put('/api/mark-notification-read/:notificationId', authMiddleware, async (re
 
 // ========== MESSAGE ROUTES ==========
 
-// Get conversation between two users
 app.get('/api/conversation/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -874,7 +855,6 @@ app.get('/api/conversation/:userId', authMiddleware, async (req, res) => {
   }
 });
 
-// Get messages (public)
 app.get('/api/messages', authMiddleware, async (req, res) => {
   try {
     const messages = await Message.find()
@@ -887,7 +867,6 @@ app.get('/api/messages', authMiddleware, async (req, res) => {
   }
 });
 
-// Send media message
 app.post('/api/send-media-message', authMiddleware, uploadMedia.single('media'), async (req, res) => {
   try {
     const { toUserId, messageType, caption } = req.body;
@@ -970,7 +949,6 @@ app.post('/api/send-media-message', authMiddleware, uploadMedia.single('media'),
   }
 });
 
-// Download media file
 app.get('/api/download-media/:filename', authMiddleware, async (req, res) => {
   try {
     const { filename } = req.params;
@@ -989,7 +967,6 @@ app.get('/api/download-media/:filename', authMiddleware, async (req, res) => {
 
 // ========== MESSAGE DELETION ROUTES ==========
 
-// Delete message for myself
 app.delete('/api/delete-message-for-me/:messageId', authMiddleware, async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -1029,7 +1006,6 @@ app.delete('/api/delete-message-for-me/:messageId', authMiddleware, async (req, 
   }
 });
 
-// Delete message for everyone
 app.delete('/api/delete-message-for-everyone/:messageId', authMiddleware, async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -1061,7 +1037,6 @@ app.delete('/api/delete-message-for-everyone/:messageId', authMiddleware, async 
   }
 });
 
-// Clear entire chat history
 app.delete('/api/clear-chat/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1099,7 +1074,6 @@ app.delete('/api/clear-chat/:userId', authMiddleware, async (req, res) => {
 
 // ========== SETTINGS ROUTES ==========
 
-// Update Username
 app.put('/api/update-username', authMiddleware, async (req, res) => {
   try {
     const { newUsername } = req.body;
@@ -1154,7 +1128,6 @@ app.put('/api/update-username', authMiddleware, async (req, res) => {
   }
 });
 
-// Upload Profile Picture
 app.post('/api/upload-profile-picture', authMiddleware, uploadProfile.single('profilePicture'), async (req, res) => {
   try {
     if (!req.file) {
@@ -1188,7 +1161,6 @@ app.post('/api/upload-profile-picture', authMiddleware, uploadProfile.single('pr
   }
 });
 
-// Remove Profile Picture
 app.delete('/api/remove-profile-picture', authMiddleware, async (req, res) => {
   try {
     if (req.user.profilePicture) {
@@ -1215,7 +1187,6 @@ app.delete('/api/remove-profile-picture', authMiddleware, async (req, res) => {
   }
 });
 
-// Get User Settings
 app.get('/api/user-settings', authMiddleware, async (req, res) => {
   try {
     res.json({
@@ -1233,7 +1204,6 @@ app.get('/api/user-settings', authMiddleware, async (req, res) => {
   }
 });
 
-// Default route
 app.get('/', (req, res) => {
   res.json({ message: 'Chat App API is running' });
 });

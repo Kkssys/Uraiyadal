@@ -4,7 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 
 const UnifiedFriendButton = ({ user, targetUser, onStatusChange, socket }) => {
   const { colors } = useTheme();
-  const [status, setStatus] = useState('none'); // none, pending, received, friends
+  const [status, setStatus] = useState('none');
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -44,6 +44,7 @@ const UnifiedFriendButton = ({ user, targetUser, onStatusChange, socket }) => {
   const checkFriendStatus = async () => {
     try {
       const token = localStorage.getItem('token');
+      
       // Check if already friends
       const friendsResponse = await axios.get('/api/friends', {
         headers: { Authorization: `Bearer ${token}` }
