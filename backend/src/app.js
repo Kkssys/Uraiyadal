@@ -20,10 +20,10 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5000',
-  'https://transcendent-piroshki-be2b86.netlify.app',
+  'https://transcendent-piroshki-be2b86.netlify.app',  // Old Netlify URL
+  'https://uraiyadal-chat.netlify.app',               // NEW Netlify URL - ADD THIS
   'https://uraiyadal-o842.onrender.com'
 ];
-
 // CORS middleware
 app.use(cors({
   origin: function(origin, callback) {
