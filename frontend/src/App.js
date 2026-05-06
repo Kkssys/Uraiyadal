@@ -153,26 +153,44 @@ function App() {
     await fetchFriends();
   };
 
-  // Setup socket connection
+  // Setup socket connection with fixed configuration
   useEffect(() => {
     if (token && user) {
       fetchFriends();
       fetchUnreadRequests();
       
-     // In your App.js, update the socket connection code
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
-
-const newSocket = io(SOCKET_URL, {
-  auth: { token },
-  transports: ['polling'], // Use only polling instead of websocket
-  reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1000,
-  timeout: 20000
-});
+      const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+      
+      // Detect if running on Render (production)
+      const isRenderHost = window.location.hostname.includes('render.com') || 
+                           SOCKET_URL.includes('render.com');
+      
+      console.log('Connecting to Socket.io at:', SOCKET_URL);
+      console.log('Using transports:', isRenderHost ? 'polling only' : 'polling + websocket');
+      
+      // Socket connection with fixed configuration - use polling only for Render to avoid WebSocket errors
+      const newSocket = io(SOCKET_URL, {
+        auth: { token },
+        transports: ['polling'], // Force polling only - prevents WebSocket errors
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 30000,
+        withCredentials: true,
+        forceNew: true
+      });
 
       newSocket.on('connect', () => {
-        console.log('✅ Socket connected');
+        console.log('✅ Socket connected successfully');
+      });
+
+      newSocket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error.message);
+      });
+
+      newSocket.on('disconnect', (reason) => {
+        console.log('Socket disconnected:', reason);
       });
 
       newSocket.on('online-users-update', (onlineUsersList) => {
@@ -195,7 +213,10 @@ const newSocket = io(SOCKET_URL, {
       setSocket(newSocket);
 
       return () => {
-        newSocket.close();
+        if (newSocket) {
+          newSocket.disconnect();
+          newSocket.close();
+        }
       };
     }
   }, [token, user]);
@@ -256,6 +277,7 @@ const newSocket = io(SOCKET_URL, {
 
   const handleLogout = () => {
     if (socket) {
+      socket.disconnect();
       socket.close();
     }
     setToken(null);
@@ -292,7 +314,7 @@ const newSocket = io(SOCKET_URL, {
   if (token && user) {
     const onlineCount = friends.filter(f => f.online).length;
     
-    // Updated mobile responsive styles
+    // Mobile responsive styles
     const mobileStyles = {
       container: {
         display: 'flex',

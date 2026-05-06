@@ -17,7 +17,6 @@ const io = socketIo(server, {
       "http://localhost:3000",
       "http://localhost:5000",
       "https://uraiyadal-chat.netlify.app",
-      "https://transcendent-piroshki-be2b86.netlify.app",
       "https://uraiyadal-o842.onrender.com"
     ],
     credentials: true,
@@ -25,7 +24,11 @@ const io = socketIo(server, {
     allowedHeaders: ["Content-Type", "Authorization"]
   },
   transports: ['polling', 'websocket'],
-  allowEIO3: true
+  allowEIO3: true,
+  allowUpgrades: false, // Prevent WebSocket upgrade issues
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  perMessageDeflate: false
 });
 
 // Track online users
