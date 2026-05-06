@@ -159,12 +159,17 @@ function App() {
       fetchFriends();
       fetchUnreadRequests();
       
-      const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
-      
-      const newSocket = io(SOCKET_URL, {
-        auth: { token },
-        transports: ['polling', 'websocket']
-      });
+     // In your App.js, update the socket connection code
+const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+
+const newSocket = io(SOCKET_URL, {
+  auth: { token },
+  transports: ['polling'], // Use only polling instead of websocket
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+  timeout: 20000
+});
 
       newSocket.on('connect', () => {
         console.log('✅ Socket connected');
